@@ -42,14 +42,8 @@ TASK 1: NATURAL GAS PRICE ANALYSIS
 ├── natural_gas_pricing_model.py (400+ lines)
 ├── demo_usage.py
 ├── Natural_Gas_Pricing_Model.ipynb
-├── README.md (50+ pages)
-├── EXECUTIVE_SUMMARY.md
-├── COMPARISON_THREE_APPROACHES.md
-├── CODE_COMPARISON_DETAILED.md
-├── OUTPUT_COMPARISON_ACTUAL_NUMBERS.md
-├── INDEX_AND_GUIDE.md
+├── Task1 README.md 
 ├── extended_nat_gas_prices.csv
-├── monthly_nat_gas_prices.csv
 └── natural_gas_analysis.png
 
 TASK 2: STORAGE CONTRACT PRICING
