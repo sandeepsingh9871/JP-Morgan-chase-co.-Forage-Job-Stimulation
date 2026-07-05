@@ -1,0 +1,430 @@
+# Natural Gas Storage Contract Pricing Model
+## JPMorgan Chase Quantitative Research Task
+
+### Overview
+
+This solution analyzes monthly natural gas prices (Oct 31, 2020 - Sep 30, 2024) and builds a model that:
+- **Interpolates** historical prices for any date in the past
+- **Extrapolates** prices for up to 1 year into the future
+- **Identifies seasonal patterns** to support storage contract pricing
+- **Prices storage contracts** by comparing injection and withdrawal costs
+
+---
+
+## Key Findings
+
+### Seasonal Pattern Analysis
+
+**Peak (Winter) Months - Best for SELLING:**
+- January: $11.78/MMBtu
+- March: $11.78/MMBtu  
+- February: $11.70/MMBtu
+- December: $11.70/MMBtu
+- November: $11.32/MMBtu
+
+**Trough (Summer) Months - Best for BUYING:**
+- June: $10.70/MMBtu ← Lowest
+- October: $10.75/MMBtu
+- May: $10.79/MMBtu
+- August: $10.82/MMBtu
+- July: $10.90/MMBtu
+
+**Seasonal Spread:** $1.08/MMBtu (9.6% of annual average)
+
+### Historical Price Range
+- Minimum: $9.84/MMBtu (May 2021)
+- Maximum: $12.80/MMBtu (December 2023)
+- Average: $11.21/MMBtu
+
+### Year-over-Year Trends
+- **2020-2021:** Stable low prices (~$10/MMBtu)
+- **2021-2022:** Significant price increase (avg $11.5/MMBtu)
+- **2022-2023:** Peak pricing (avg $12.0/MMBtu)
+- **2023-2024:** Price stabilization ($11.5/MMBtu)
+
+---
+
+## Technical Approach
+
+### Data Processing
+1. **Input:** Monthly snapshot prices (end-of-month, 48 data points)
+2. **Parsing:** Convert date strings and numeric prices from scientific notation
+3. **Enrichment:** Add year, month, and day-of-year features
+
+### Modeling Components
+
+#### 1. **Cubic Spline Interpolation** (Historical Dates)
+```
+For dates within the data range (Oct 31, 2020 - Sep 30, 2024):
+- Uses cubic spline with natural boundary conditions
+- Provides smooth price estimates between monthly data points
+- Maintains monotonicity and continuity
+```
+
+**Method:** `scipy.interpolate.CubicSpline`
+- Natural splines prevent oscillation
+- Better than linear interpolation for commodity pricing
+
+#### 2. **Seasonal Decomposition** (Pattern Analysis)
+```
+Decomposition = Trend + Seasonal + Residual
+
+Seasonal Component:
+- Average price by calendar month (12 values)
+- Identifies which months are naturally expensive/cheap
+```
+
+**Method:** `statsmodels.tsa.seasonal.seasonal_decompose`
+- Additive model (Price = Trend + Seasonal + Error)
+- 12-month period for annual seasonality
+
+#### 3. **Trend-Based Extrapolation** (Future Dates)
+```
+Future Price = Trend Component + Seasonal Adjustment
+
+Where:
+- Trend = Linear projection of last 6 months
+- Seasonal Adjustment = Month-specific average minus annual mean
+```
+
+**Extrapolation Range:** Oct 1, 2024 - Sep 30, 2025 (1 year ahead)
+
+---
+
+## Model Usage
+
+### Basic Price Query
+
+```python
+from natural_gas_pricing_model import NaturalGasPricingModel
+
+# Initialize model
+model = NaturalGasPricingModel('Nat_Gas.csv')
+
+# Get price for a specific date
+price = model.get_price('2025-06-15')
+print(f"Price on June 15, 2025: ${price:.2f}/MMBtu")
+# Output: Price on June 15, 2025: $11.37/MMBtu
+```
+
+### Date Range Query
+
+```python
+# Get daily prices for a period
+df = model.get_price_range('2025-01-01', '2025-03-31', frequency='D')
+print(f"Q1 2025 average: ${df['Price'].mean():.2f}/MMBtu")
+# Output: Q1 2025 average: $11.82/MMBtu
+
+# Get monthly prices for extrapolation period
+df = model.get_price_range('2024-10-01', '2025-09-30', frequency='MS')
+```
+
+### Storage Contract Analysis
+
+```python
+# Analyze a summer-to-winter storage strategy
+result = model.storage_contract_analysis('2025-07-01', '2025-12-31')
+
+print(f"Injection Price: ${result['injection_price']}/MMBtu")
+print(f"Withdrawal Price: ${result['withdrawal_price']}/MMBtu")
+print(f"Price Spread: ${result['price_spread']}/MMBtu")
+print(f"Storage Cost: ${result['estimated_storage_cost']}/MMBtu")
+print(f"Net Profit: ${result['net_profit_potential']}/MMBtu")
+print(f"Profitable: {result['profitable']}")
+```
+
+### Seasonal Analysis
+
+```python
+# Access seasonal patterns
+seasonal_avg = model.seasonal_avg
+
+# Get average price for a specific month
+jan_price = seasonal_avg[1]  # January
+print(f"January average: ${jan_price:.2f}/MMBtu")
+
+# Identify best buying/selling months
+cheapest_month = seasonal_avg.idxmin()
+expensive_month = seasonal_avg.idxmax()
+```
+
+---
+
+## Key Model Parameters
+
+### Interpolation
+- **Method:** Natural cubic spline
+- **Boundary Condition:** Natural (second derivative = 0 at endpoints)
+- **Number of Points:** 48 historical monthly observations
+
+### Extrapolation
+- **Trend Period:** Last 6 months of data
+- **Trend Type:** Linear regression on daily basis
+- **Seasonality Weight:** 30% of seasonal adjustment applied
+- **Minimum Price Floor:** $0.50/MMBtu (below market floor)
+
+### Storage Cost Assumption
+- **Fixed Rate:** $0.50/MMBtu per month
+- **Duration-Based:** Scales with days held
+
+---
+
+## Use Cases
+
+### 1. Summer-to-Winter Storage Strategy
+```
+Scenario: Buy cheap gas in summer, store, sell in winter
+
+Example:
+- Inject: July 1, 2025 @ $11.42/MMBtu
+- Withdraw: January 31, 2025 @ $11.84/MMBtu
+- Spread: $0.42/MMBtu
+- Storage Cost: $3.07/MMBtu (7 months)
+- Net P&L: -$2.71/MMBtu
+
+Note: 2025 is a low-volatility year; historically offers better spreads
+```
+
+### 2. Storage Contract Pricing
+```
+Use case: Warehouse operator pricing storage capacity
+
+Input: Expected injection and withdrawal dates
+Output: Required spread to cover storage costs + profit margin
+
+Calculation:
+Minimum Spread = Storage Cost + Operator Margin
+Storage Cost = $0.50/MMBtu/month × months held
+```
+
+### 3. Risk Management
+```
+Use case: Hedging seasonal exposure
+
+Tool: Use daily price estimates to value forward contracts
+Benefit: Granular pricing vs. only having monthly snapshots
+```
+
+### 4. Portfolio Analysis
+```
+Use case: Evaluate natural gas holdings
+
+Features:
+- Estimate value at any date
+- Project future valuations
+- Identify seasonal risks
+```
+
+---
+
+## File Outputs
+
+### 1. `natural_gas_pricing_model.py`
+Main module containing the `NaturalGasPricingModel` class with:
+- Data loading and preprocessing
+- Seasonal analysis
+- Interpolation and extrapolation
+- Storage contract pricing
+- Visualization generation
+
+### 2. `demo_usage.py`
+Demonstration script showing:
+- Basic price estimation
+- Storage contract analysis
+- Seasonal insights
+- Advanced pricing scenarios
+
+### 3. `natural_gas_analysis.png`
+Four-panel visualization:
+1. **Top Left:** Historical prices + spline fit + extrapolation
+2. **Top Right:** Seasonal pattern by month
+3. **Bottom Left:** Price trend decomposition
+4. **Bottom Right:** Year-over-year comparison
+
+### 4. `extended_nat_gas_prices.csv`
+Extended dataset with monthly prices from Oct 2020 to Sep 2025:
+- Columns: Date, Price
+- Frequency: Monthly (start of month)
+- Format: CSV with headers
+
+---
+
+## Limitations and Assumptions
+
+### Current Assumptions
+1. **Seasonality is consistent:** Assumes past seasonal patterns continue
+2. **Linear trend:** Uses simple linear regression for future trend
+3. **No structural breaks:** Model doesn't account for regime changes
+4. **Fixed storage cost:** Assumes $0.50/MMBtu per month
+5. **No market frictions:** Ignores bid-ask spreads, transaction costs
+
+### Data Quality
+- 48 data points for 4 years (monthly)
+- No missing data or gaps
+- All prices positive and reasonable
+
+### Extrapolation Limits
+- **Valid Range:** Up to 1 year beyond Sep 30, 2024
+- **Confidence:** Decreases as you move further into the future
+- **Recommendation:** Use as indicative only; update with new data quarterly
+
+---
+
+## Recommendations for Production Use
+
+### 1. Real-Time Data Integration
+```python
+# Update model with latest market data
+# Consider integration with CME, EIA, or Refinitiv feeds
+
+# Run quarterly model retraining
+# As new data arrives, incorporate into spline fitting
+```
+
+### 2. Enhanced Forecasting
+```
+Current: Linear trend extrapolation
+Better options:
+- ARIMA models for autocorrelation
+- Exponential smoothing (Holt-Winters)
+- Machine learning (LSTM, GRU) for longer term
+```
+
+### 3. External Factors
+```
+Incorporate:
+- Weather data (heating/cooling degree days)
+- Crude oil prices (correlated)
+- Production/inventory levels (EIA data)
+- Geopolitical risk (conflict in supplier regions)
+- Macroeconomic indicators (GDP, interest rates)
+```
+
+### 4. Validation and Backtesting
+```
+Evaluate:
+- Out-of-sample accuracy on held-out test set
+- Compare to CME futures prices
+- Calculate MAPE (Mean Absolute Percentage Error)
+- Stress test during volatile periods (2022)
+```
+
+### 5. Confidence Intervals
+```
+Provide uncertainty bands:
+- ±1 sigma (68% confidence)
+- ±2 sigma (95% confidence)
+- Wider for distant future dates
+```
+
+---
+
+## API Reference
+
+### NaturalGasPricingModel Class
+
+#### Constructor
+```python
+NaturalGasPricingModel(csv_path: str)
+```
+- **Parameters:** Path to CSV file with columns [Dates, Prices]
+- **Raises:** ValueError if file format is invalid
+
+#### Methods
+
+##### `get_price(date) -> float`
+Get price estimate for a single date
+```python
+price = model.get_price('2025-06-15')
+# Returns: 11.37 (price in $/MMBtu)
+```
+
+##### `get_price_range(start_date, end_date, frequency='D') -> DataFrame`
+Get prices for a date range
+```python
+df = model.get_price_range('2025-01-01', '2025-12-31', frequency='D')
+# Returns: DataFrame with columns [Date, Price]
+```
+
+##### `storage_contract_analysis(injection_date, withdrawal_date) -> dict`
+Analyze profitability of a storage contract
+```python
+result = model.storage_contract_analysis('2025-07-01', '2025-12-31')
+# Returns: dict with injection_price, withdrawal_price, net_profit_potential, etc.
+```
+
+##### `visualize_analysis(save_path=None) -> Figure`
+Generate comprehensive 4-panel visualization
+```python
+fig = model.visualize_analysis('output.png')
+```
+
+#### Properties
+```python
+model.min_date          # Earliest data point
+model.max_date          # Latest data point
+model.extrapolation_end # Maximum extrapolation date
+model.seasonal_avg      # Dict: {month: avg_price}
+model.df                # Raw DataFrame
+```
+
+---
+
+## Example Outputs
+
+### Sample Price Estimates
+```
+2020-10-31 (Historical): $10.10/MMBtu
+2021-06-15 (Historical): $9.87/MMBtu
+2024-09-30 (Historical): $11.80/MMBtu
+2024-12-15 (Extrapolated): $11.87/MMBtu
+2025-06-30 (Extrapolated): $11.37/MMBtu
+2025-09-30 (Extrapolated): $11.38/MMBtu
+```
+
+### Seasonal Pattern
+```
+Month        Avg Price    Spread from Mean   Best Use
+────────────────────────────────────────────────────
+January      $11.78       +$0.57             SELL
+February     $11.70       +$0.49             SELL
+March        $11.78       +$0.57             SELL
+April        $11.18       -$0.03             HOLD
+May          $10.79       -$0.42             BUY
+June         $10.70       -$0.51             BUY ✓
+July         $10.90       -$0.31             BUY
+August       $10.82       -$0.39             BUY
+September    $11.07       -$0.14             NEUTRAL
+October      $10.75       -$0.46             BUY
+November     $11.32       +$0.11             NEUTRAL
+December     $11.70       +$0.49             SELL
+```
+
+---
+
+## Questions and Support
+
+### Common Issues
+
+**Q: Date is beyond extrapolation range**
+- A: Maximum valid date is Sep 30, 2025. Rerun model with more recent data to extend range.
+
+**Q: Why are extrapolated prices different from expected?**
+- A: Model uses linear trend from last 6 months + seasonal adjustment. Check if recent volatility differs from historical norms.
+
+**Q: How accurate are the price estimates?**
+- A: Historical estimates (within data range) use cubic spline fitting. Extrapolation accuracy decreases over time.
+
+**Q: Can I use this for high-frequency trading?**
+- A: Model works with monthly data. For intra-day trading, use real-time CME futures prices instead.
+
+---
+
+## Version History
+
+- **v1.0** (June 2026): Initial implementation
+  - Cubic spline interpolation for historical data
+  - Trend-based extrapolation for future dates
+  - Seasonal pattern analysis
+  - Storage contract pricing
+  - Comprehensive visualization
