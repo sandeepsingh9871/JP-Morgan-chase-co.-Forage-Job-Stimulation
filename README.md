@@ -39,7 +39,7 @@ MASTER INDEX & SUMMARIES
 ├── COMPLETE_DELIVERABLES_INDEX.md
 
 TASK 1: NATURAL GAS PRICE ANALYSIS
-├── natural_gas_pricing_model.py (400+ lines)
+├── natural_gas_pricing_model.py 
 ├── demo_usage.py
 ├── Natural_Gas_Pricing_Model.ipynb
 ├── Task1 README.md 
@@ -47,21 +47,20 @@ TASK 1: NATURAL GAS PRICE ANALYSIS
 └── natural_gas_analysis.png
 
 TASK 2: STORAGE CONTRACT PRICING
-├── storage_contract_pricer.py (540+ lines)
+├── storage_contract_pricer.py 
 ├── Task_2_Storage_Contract_Pricing.ipynb
-├── TASK_2_DOCUMENTATION.md (60+ pages)
-└── TASK_2_SUMMARY.md
+├── TASK_2_DOCUMENTATION.md
 
 TASK 3: CREDIT RISK - PROBABILITY OF DEFAULT
-├── credit_risk_model.py (400+ lines)
+├── credit_risk_model.py 
 ├── Task_3_Credit_Risk_Analysis.ipynb
-├── TASK_3_DOCUMENTATION.md (60+ pages)
+├── TASK_3_DOCUMENTATION.md 
 └── TASK_3_SUMMARY.md
 
 TASK 4: FICO SCORE QUANTIZATION
-├── fico_quantizer.py (500+ lines)
+├── fico_quantizer.py
 ├── Task_4_FICO_Quantization.ipynb
-├── TASK_4_DOCUMENTATION.md (80+ pages)
+├── TASK_4_DOCUMENTATION.md 
 └── TASK_4_SUMMARY.md
 ```
 
